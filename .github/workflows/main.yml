@@ -14,22 +14,21 @@ jobs:
 build:
 runs-on: ubuntu-latest
 steps:
-- name: Checkout repository
+- name: Checkout
 uses: actions/checkout@v4
 
-  - name: Extract Android project
+  - name: Extract project
     run: |
+      sudo apt-get update
+      sudo apt-get install -y unzip
+      mkdir extracted
       unzip -o ClockInspiredAndroidProject.zip -d extracted
-      if [ -f extracted/settings.gradle ]; then
-        cp -a extracted/. .
-      else
-        dir=$(find extracted -name settings.gradle -printf '%h\n' | head -n 1)
-        if [ -z "$dir" ]; then
-          echo "Could not find Android project in ZIP"
-          exit 1
-        fi
-        cp -a "$dir"/. .
+      find extracted -name settings.gradle -o -name settings.gradle.kts
+      PROJECT_DIR=$(dirname "$(find extracted -name settings.gradle -o -name settings.gradle.kts | head -n 1)")
+      if [ "$PROJECT_DIR" = "extracted" ] || [ -z "$PROJECT_DIR" ]; then
+        PROJECT_DIR="extracted"
       fi
+      cp -a "$PROJECT_DIR"/. .
 
   - name: Set up Java
     uses: actions/setup-java@v4
@@ -42,11 +41,12 @@ uses: actions/checkout@v4
 
   - name: Build APK
     run: |
-      chmod +x gradlew 2>/dev/null || true
       if [ -f gradlew ]; then
+        chmod +x gradlew
         ./gradlew assembleDebug
       else
-        gradle assembleDebug
+        echo "Gradle wrapper missing from project"
+        exit 1
       fi
 
   - name: Upload APK
