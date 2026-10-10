@@ -1,32 +1,28 @@
 name: Build Clock APK
 
-on:
+'on':
 workflow_dispatch:
 push:
-paths:
-- 'ClockInspiredAndroidProject.zip'
-- '.github/workflows/main.yml'
-
-permissions:
-contents: read
 
 jobs:
 build:
 runs-on: ubuntu-latest
 steps:
-- name: Checkout
+- name: Checkout repository
 uses: actions/checkout@v4
 
   - name: Extract project
     run: |
       sudo apt-get update
       sudo apt-get install -y unzip
-      mkdir extracted
       unzip -o ClockInspiredAndroidProject.zip -d extracted
-      find extracted -name settings.gradle -o -name settings.gradle.kts
-      PROJECT_DIR=$(dirname "$(find extracted -name settings.gradle -o -name settings.gradle.kts | head -n 1)")
-      if [ "$PROJECT_DIR" = "extracted" ] || [ -z "$PROJECT_DIR" ]; then
-        PROJECT_DIR="extracted"
+      PROJECT_DIR=$(find extracted -name settings.gradle -type f -printf '%h\n' | head -n 1)
+      if [ -z "$PROJECT_DIR" ]; then
+        PROJECT_DIR=$(find extracted -name settings.gradle.kts -type f -printf '%h\n' | head -n 1)
+      fi
+      if [ -z "$PROJECT_DIR" ]; then
+        echo "ERROR: No Gradle Android project found in ZIP"
+        exit 1
       fi
       cp -a "$PROJECT_DIR"/. .
 
@@ -41,13 +37,12 @@ uses: actions/checkout@v4
 
   - name: Build APK
     run: |
-      if [ -f gradlew ]; then
-        chmod +x gradlew
-        ./gradlew assembleDebug
-      else
-        echo "Gradle wrapper missing from project"
+      if [ ! -f gradlew ]; then
+        echo "ERROR: Gradle wrapper gradlew is missing"
         exit 1
       fi
+      chmod +x gradlew
+      ./gradlew assembleDebug
 
   - name: Upload APK
     uses: actions/upload-artifact@v4
