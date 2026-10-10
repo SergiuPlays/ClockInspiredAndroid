@@ -3,28 +3,19 @@ name: Build Clock APK
 'on':
 workflow_dispatch:
 push:
+branches:
+- main
+
+permissions:
+contents: read
 
 jobs:
 build:
 runs-on: ubuntu-latest
-steps:
-- name: Checkout repository
-uses: actions/checkout@v4
 
-  - name: Extract project
-    run: |
-      sudo apt-get update
-      sudo apt-get install -y unzip
-      unzip -o ClockInspiredAndroidProject.zip -d extracted
-      PROJECT_DIR=$(find extracted -name settings.gradle -type f -printf '%h\n' | head -n 1)
-      if [ -z "$PROJECT_DIR" ]; then
-        PROJECT_DIR=$(find extracted -name settings.gradle.kts -type f -printf '%h\n' | head -n 1)
-      fi
-      if [ -z "$PROJECT_DIR" ]; then
-        echo "ERROR: No Gradle Android project found in ZIP"
-        exit 1
-      fi
-      cp -a "$PROJECT_DIR"/. .
+steps:
+  - name: Checkout repository
+    uses: actions/checkout@v4
 
   - name: Set up Java
     uses: actions/setup-java@v4
@@ -35,10 +26,25 @@ uses: actions/checkout@v4
   - name: Set up Android SDK
     uses: android-actions/setup-android@v3
 
-  - name: Build APK
+  - name: Install unzip
+    run: sudo apt-get update && sudo apt-get install -y unzip
+
+  - name: Extract Android project
+    shell: bash
+    run: |
+      unzip -o ClockInspiredAndroidProject.zip -d extracted
+      PROJECT_DIR="$(find extracted -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)"
+      if [ -z "$PROJECT_DIR" ]; then
+        echo "ERROR: No Android Gradle project found inside the ZIP."
+        exit 1
+      fi
+      PROJECT_DIR="$(dirname "$PROJECT_DIR")"
+      cp -a "$PROJECT_DIR"/. .
+
+  - name: Build debug APK
     run: |
       if [ ! -f gradlew ]; then
-        echo "ERROR: Gradle wrapper gradlew is missing"
+        echo "ERROR: gradlew is missing from the Android project."
         exit 1
       fi
       chmod +x gradlew
@@ -49,3 +55,4 @@ uses: actions/checkout@v4
     with:
       name: Clock-debug-APK
       path: app/build/outputs/apk/debug/*.apk
+      if-no-files-found: error
